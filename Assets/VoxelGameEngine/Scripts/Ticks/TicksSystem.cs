@@ -1,23 +1,26 @@
-using UnityEngine;
 using Unity.Entities;
-using Random = Unity.Mathematics.Random;
+using Unity.Burst;
 
 namespace VoxelGameEngine.Ticks
 {
     [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+    [BurstCompile]
     public partial struct TicksSystem : ISystem
     {
-        private uint timeCycle;
+        private uint dayValue;
+
+        [BurstCompile]
         void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<TicksComponent>();
-            timeCycle = 28800;
+            dayValue = 28800;
         }
 
+        [BurstCompile]
         void OnUpdate(ref SystemState state) 
         {
             ref TicksComponent ticksComponent = ref SystemAPI.GetSingletonRW<TicksComponent>().ValueRW;
-            if (ticksComponent.Value >= timeCycle)
+            if (ticksComponent.Value >= dayValue)
             {
                 ticksComponent.Value = 0;
             }
