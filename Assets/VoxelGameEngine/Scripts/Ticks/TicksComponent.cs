@@ -4,6 +4,6 @@ namespace VoxelGameEngine.Ticks
 {
     public struct TicksComponent : IComponentData
     {
-        public uint Value;
+        public long Value;
     }
 }

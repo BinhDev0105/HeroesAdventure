@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Unity.Entities;
 using Unity.Mathematics;
 using VoxelGameEngine.World;
@@ -6,19 +5,22 @@ using UnityEngine;
 using Random = Unity.Mathematics.Random;
 using Debug = UnityEngine.Debug;
 using Unity.Collections;
+using Unity.Transforms;
+using VoxelGameEngine.Ticks;
 
 namespace VoxelGameEngine.Chunk
 {
     public partial struct ChunkSpawnerSystem : ISystem
     {
+        private int3 minPosition;
+        private int3 maxPosition;
         private Random random;
         private EntityCommandBuffer ecb;
-        private int randNum;
         void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<ChunkComponent>();
-            random = Random.CreateFromIndex(0);
-            randNum = 50;
+            minPosition = new int3(-50, 0, -50);
+            maxPosition = new int3(50, 0, 50);
         }
 
 
@@ -26,16 +28,29 @@ namespace VoxelGameEngine.Chunk
         {
             ref WorldComponent worldComponent = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
             ref ChunkComponent chunkComponent = ref SystemAPI.GetSingletonRW<ChunkComponent>().ValueRW;
-            //ref ChunkListComponent chunkListComponent = ref SystemAPI.GetSingletonRW<ChunkListComponent>().ValueRW;
+            ref DateTimeTicksComponent ticksComponent = ref SystemAPI.GetSingletonRW<DateTimeTicksComponent>().ValueRW;
 
-            float3 randPosition = random.NextInt3(-randNum, randNum) * worldComponent.ChunkSize;
-            Debug.Log(randPosition);
+            ecb = SystemAPI.GetSingletonRW<EndSimulationEntityCommandBufferSystem.Singleton>().ValueRW.CreateCommandBuffer(state.WorldUnmanaged);
 
-            NativeArray<float3> count = WorldHelper.GetChunkPositionAroundOriginPosition(worldComponent, randPosition);
-            //foreach (var item in count)
-            //{
-            //    Debug.Log(item);
-            //}
+            random.InitState((uint)ticksComponent.Value);
+
+            ticksComponent.Active = false;
+
+            float3 randomPosition = random.NextInt3(minPosition, maxPosition) * worldComponent.ChunkSize;
+
+            NativeArray<float3> chunkPositionArray = WorldHelper.GetChunkPositionAroundOriginPosition(worldComponent, randomPosition);
+
+            NativeArray<Entity> chunkEntityArray = new NativeArray<Entity>(chunkPositionArray.Length, Allocator.Temp);
+
+            ecb.Instantiate(chunkComponent.ChunkPrefab, chunkEntityArray);
+
+            for (int i = 0; i < chunkEntityArray.Length; i++)
+            {
+                ecb.SetComponent(chunkEntityArray[i], LocalTransform.FromPosition(chunkPositionArray[i]));
+            }
+
+            chunkEntityArray.Dispose();
+            chunkPositionArray.Dispose();
             state.Enabled = false;
         }
     }

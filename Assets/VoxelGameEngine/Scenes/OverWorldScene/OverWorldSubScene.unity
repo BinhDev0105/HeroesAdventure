@@ -207,7 +207,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c376716e40a946742b9d8fe0d15b7fa1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ChunkRange: 1
+  ChunkRange: 2
   ChunkSize: 20
   ChunkHeight: 100
 --- !u!1 &1645092434
@@ -254,7 +254,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a4ad6eca1af8f04695a9c35af774985, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ChunkPrefab: {fileID: 919132149155446097, guid: 5c4c88965a71b3340b2c9b643d77a61e, type: 3}
+  ChunkPrefab: {fileID: 919132149155446097, guid: 4305545e7f035f3459bf5d3e092687df, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

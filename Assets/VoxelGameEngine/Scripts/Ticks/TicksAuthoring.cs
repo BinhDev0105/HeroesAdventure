@@ -11,6 +11,7 @@ namespace VoxelGameEngine.Ticks
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
                 AddComponent(entity, new TicksComponent {});
+                AddComponent(entity, new DateTimeTicksComponent { Active = true});
             }
         }
     }
