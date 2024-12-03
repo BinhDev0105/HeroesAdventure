@@ -3,7 +3,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace VoxelGameEngine.ThirdPerson
+namespace VoxelGameEngine
 {
     [DisallowMultipleComponent]
     public class ThirdPersonCharacterAuthoring : MonoBehaviour
@@ -42,8 +42,10 @@ namespace VoxelGameEngine.ThirdPerson
                     PreventAirAccelerationAgainstUngroundedHits = authoring.PreventAirAccelerationAgainstUngroundedHits,
                     StepAndSlopeHandling = authoring.StepAndSlopeHandling,
                 });
-                AddComponent(entity, new ThirdPersonCharacterControlComponent());
+                AddComponent(entity, new ThirdPersonCharacterControl());
             }
         }
+
     }
+
 }

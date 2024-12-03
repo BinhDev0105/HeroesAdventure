@@ -1,9 +1,10 @@
 using System;
+using Unity.CharacterController;
 using Unity.Entities;
 using Unity.Mathematics;
-using Unity.CharacterController;
+using UnityEngine;
 
-namespace VoxelGameEngine.ThirdPerson
+namespace VoxelGameEngine
 {
     [Serializable]
     public struct ThirdPersonCharacterComponent : IComponentData
@@ -21,7 +22,7 @@ namespace VoxelGameEngine.ThirdPerson
     }
 
     [Serializable]
-    public struct ThirdPersonCharacterControlComponent : IComponentData
+    public struct ThirdPersonCharacterControl : IComponentData
     {
         public float3 MoveVector;
         public bool Jump;

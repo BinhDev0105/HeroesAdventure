@@ -1,7 +1,7 @@
 using Unity.Entities;
 using UnityEngine;
 
-namespace VoxelGameEngine.ThirdPerson
+namespace VoxelGameEngine
 {
     [DisallowMultipleComponent]
     public class ThirdPersonPlayerAuthoring : MonoBehaviour
@@ -14,7 +14,7 @@ namespace VoxelGameEngine.ThirdPerson
             public override void Bake(ThirdPersonPlayerAuthoring authoring)
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
-                AddComponent(entity, new ThirdPersonPlayerComponent
+                AddComponent(entity, new ThirdPersonPlayer
                 {
                     ControlledCharacter = GetEntity(authoring.ControlledCharacter, TransformUsageFlags.Dynamic),
                     ControlledCamera = GetEntity(authoring.ControlledCamera, TransformUsageFlags.Dynamic),

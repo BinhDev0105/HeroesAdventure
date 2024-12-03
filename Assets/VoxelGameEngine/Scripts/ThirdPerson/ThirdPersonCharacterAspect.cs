@@ -4,7 +4,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using UnityEngine;
 
-namespace VoxelGameEngine.ThirdPerson
+namespace VoxelGameEngine
 {
     public struct ThirdPersonCharacterUpdateContext
     {
@@ -26,7 +26,7 @@ namespace VoxelGameEngine.ThirdPerson
     {
         public readonly KinematicCharacterAspect CharacterAspect;
         public readonly RefRW<ThirdPersonCharacterComponent> CharacterComponent;
-        public readonly RefRW<ThirdPersonCharacterControlComponent> CharacterControl;
+        public readonly RefRW<ThirdPersonCharacterControl> CharacterControl;
 
         public void PhysicsUpdate(ref ThirdPersonCharacterUpdateContext context, ref KinematicCharacterUpdateContext baseContext)
         {
@@ -56,7 +56,7 @@ namespace VoxelGameEngine.ThirdPerson
             float deltaTime = baseContext.Time.DeltaTime;
             ref KinematicCharacterBody characterBody = ref CharacterAspect.CharacterBody.ValueRW;
             ref ThirdPersonCharacterComponent characterComponent = ref CharacterComponent.ValueRW;
-            ref ThirdPersonCharacterControlComponent characterControl = ref CharacterControl.ValueRW;
+            ref ThirdPersonCharacterControl characterControl = ref CharacterControl.ValueRW;
 
             // Rotate move input and velocity to take into account parent rotation
             if (characterBody.ParentEntity != Entity.Null)
@@ -105,7 +105,7 @@ namespace VoxelGameEngine.ThirdPerson
         {
             ref KinematicCharacterBody characterBody = ref CharacterAspect.CharacterBody.ValueRW;
             ref ThirdPersonCharacterComponent characterComponent = ref CharacterComponent.ValueRW;
-            ref ThirdPersonCharacterControlComponent characterControl = ref CharacterControl.ValueRW;
+            ref ThirdPersonCharacterControl characterControl = ref CharacterControl.ValueRW;
             ref quaternion characterRotation = ref CharacterAspect.LocalTransform.ValueRW.Rotation;
 
             // Add rotation from parent body to the character rotation
