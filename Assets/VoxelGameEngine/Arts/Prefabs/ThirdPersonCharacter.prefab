@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8041698241194078798}
   - component: {fileID: -1468733986663208209}
   - component: {fileID: 5596654810389396631}
+  - component: {fileID: -3482848602916004732}
   m_Layer: 0
   m_Name: ThirdPersonCharacter
   m_TagString: Untagged
@@ -107,7 +108,7 @@ MonoBehaviour:
   JumpSpeed: 10
   Gravity:
     x: -0
-    y: -30
+    y: 0
     z: -0
   PreventAirAccelerationAgainstUngroundedHits: 1
   StepAndSlopeHandling:
@@ -132,6 +133,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Target: {fileID: 2861637503494133753}
+--- !u!114 &-3482848602916004732
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1692896102597148395}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5d0b1ea5f7e6d34bb23bd05e3dfcaf5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1692896103431116738
 GameObject:
   m_ObjectHideFlags: 0

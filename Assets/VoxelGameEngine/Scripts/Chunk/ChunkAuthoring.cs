@@ -1,4 +1,5 @@
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace VoxelGameEngine.Chunk
@@ -6,6 +7,8 @@ namespace VoxelGameEngine.Chunk
     public class ChunkAuthoring : MonoBehaviour
     {
         public GameObject ChunkPrefab;
+        public int3 MinimumPosition = new int3(-50, 0, -50);
+        public int3 MaximumPosition = new int3(50, 0, 50);
 
         class Baker : Baker<ChunkAuthoring>
         {
@@ -15,8 +18,9 @@ namespace VoxelGameEngine.Chunk
                 AddComponent(entity, new ChunkComponent
                 {
                     ChunkPrefab = GetEntity(authoring.ChunkPrefab,TransformUsageFlags.None),
+                    MinimumPosition = authoring.MinimumPosition,
+                    MaximumPosition = authoring.MaximumPosition,
                 });
-                AddComponent(entity, new ChunkListComponent { });
             }
         }
     }

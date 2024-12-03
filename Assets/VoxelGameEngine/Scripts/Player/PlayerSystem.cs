@@ -1,27 +1,31 @@
 using Unity.Entities;
 using UnityEngine;
 using VoxelGameEngine.Chunk;
-using static VoxelGameEngine.Chunk.ChunkSpawnerSystem;
+using static VoxelGameEngine.Chunk.ChunkSystem;
 using VoxelGameEngine;
 using Unity.Mathematics;
 using Unity.Transforms;
+using Unity.Burst;
 
 namespace VoxelGameEngine.Player
 {
-    [UpdateAfter(typeof(ChunkSpawnerSystem))]
-    public partial struct PlayerSpawnSystem : ISystem
+    [UpdateAfter(typeof(ChunkSystem))]
+    [BurstCompile]
+    public partial struct PlayerSystem : ISystem
     {
-        // Start is called once before the first execution of Update after the MonoBehaviour is created
+        private EntityManager entityManager;
+        [BurstCompile]
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<ChunkSpawnerSystem.RandomPosition>();
             state.RequireForUpdate<PlayerComponent>();
+            entityManager = state.EntityManager;
         }
 
-        // Update is called once per frame
+        [BurstCompile]
         void OnUpdate(ref SystemState state)
         {
-            ref RandomPosition randomPosition = ref SystemAPI.GetSingletonRW<RandomPosition>().ValueRW;
+            /*-- Get component --*/
+            ref LastPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastPositionComponent>().ValueRW;
             ref PlayerComponent player = ref SystemAPI.GetSingletonRW<PlayerComponent>().ValueRW;
 
             EntityCommandBuffer ecb = SystemAPI.GetSingletonRW<EndSimulationEntityCommandBufferSystem.Singleton>().ValueRW.CreateCommandBuffer(state.WorldUnmanaged);
@@ -33,7 +37,7 @@ namespace VoxelGameEngine.Player
             thirdPlayer.ControlledCharacter = characterEntity;
             thirdPlayer.ControlledCamera = cameraEntity;
             ecb.SetComponent(playerEntity, thirdPlayer);
-            ecb.SetComponent(characterEntity, LocalTransform.FromPosition(randomPosition.Value));
+            ecb.SetComponent(characterEntity, LocalTransform.FromPosition(lastPosition.Value));
             state.Enabled = false;
         }
     }
