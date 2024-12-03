@@ -1,16 +1,15 @@
 {
-    "name": "VoxelGameEngine.Player",
-    "rootNamespace": "VoxelGameEngine.Player",
+    "name": "VoxelGameEngine.ThirdPerson",
+    "rootNamespace": "VoxelGameEngine.ThirdPerson",
     "references": [
         "GUID:734d92eba21c94caba915361bd5ac177",
         "GUID:8819f35a0fc84499b990e90a4ca1911f",
-        "GUID:d8b63aba1907145bea998dd612889d6b",
-        "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:2665a8d13d1b3f18800f46e256720795",
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:a5baed0c9693541a5bd947d336ec7659",
         "GUID:63afb046c8423dd448ae7aba042ea63d",
         "GUID:fba13774ff4078041871f6741c062151",
-        "GUID:f5c024683afdb6448887bc3bfcacd1b6",
+        "GUID:d8b63aba1907145bea998dd612889d6b",
         "GUID:da4d4efca588d8e43b56b5cde160c908"
     ],
     "includePlatforms": [],

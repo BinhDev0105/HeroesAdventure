@@ -1,7 +1,7 @@
 using Unity.Entities;
 using UnityEngine;
 
-namespace VoxelGameEngine.Camera
+namespace VoxelGameEngine.ThirdPerson
 {
     [DisallowMultipleComponent]
     public class MainEntityCameraAuthoring : MonoBehaviour

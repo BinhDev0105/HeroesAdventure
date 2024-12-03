@@ -2,7 +2,7 @@ using Unity.Entities;
 using Unity.Transforms;
 using UnityEngine;
 
-namespace VoxelGameEngine.Camera
+namespace VoxelGameEngine.ThirdPerson
 {
     [UpdateInGroup(typeof(PresentationSystemGroup))]
     public partial class MainCameraSystem : SystemBase
