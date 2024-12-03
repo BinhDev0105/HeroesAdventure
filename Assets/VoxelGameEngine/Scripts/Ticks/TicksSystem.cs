@@ -4,26 +4,29 @@ using System;
 
 namespace VoxelGameEngine.Ticks
 {
+    [UpdateInGroup(typeof(FixedStepSimulationSystemGroup), OrderLast = true)]
     [BurstCompile]
     public partial struct TicksSystem : ISystem
     {
-        private long maxValue;
+        public struct TickComponent : IComponentData
+        {
+            public uint Value;
+        }
 
         [BurstCompile]
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<TicksComponent>();
-            maxValue = 28800;
+            if (!SystemAPI.HasSingleton<TickComponent>())
+            {
+                Entity singletonEntity = state.EntityManager.CreateEntity();
+                state.EntityManager.AddComponentData(singletonEntity, new TickComponent());
+            }
         }
 
         [BurstCompile]
         void OnUpdate(ref SystemState state) 
         {
-            ref TicksComponent ticksComponent = ref SystemAPI.GetSingletonRW<TicksComponent>().ValueRW;
-            if (ticksComponent.Value >= maxValue)
-            {
-                ticksComponent.Value = 0;
-            }
+            ref TickComponent ticksComponent = ref SystemAPI.GetSingletonRW<TickComponent>().ValueRW;
             ticksComponent.Value++;
         }
     }

@@ -2,7 +2,7 @@ using System;
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace VoxelGameEngine.Camera
+namespace VoxelGameEngine.ThirdPerson
 {
     [Serializable]
     public struct OrbitCameraComponent : IComponentData
@@ -27,5 +27,19 @@ namespace VoxelGameEngine.Camera
         public float ObstructedDistance;
         public float PitchAngle;
         public float3 PlanarForward;
+    }
+
+    [Serializable]
+    public struct OrbitCameraControlComponent: IComponentData
+    {
+        public Entity FollowedCharacterEntity;
+        public float2 LookDegreesDelta;
+        public float ZoomDelta;
+    }
+
+    [Serializable]
+    public struct OrbitCameraIgnoredEntityBufferElement : IBufferElementData
+    {
+        public Entity Entity;
     }
 }

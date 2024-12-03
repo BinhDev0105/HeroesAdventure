@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace VoxelGameEngine.Camera
+namespace VoxelGameEngine.ThirdPerson
 {
     public class MainGameObjectCamera : MonoBehaviour
     {

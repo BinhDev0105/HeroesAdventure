@@ -2,7 +2,7 @@ using System;
 using Unity.Entities;
 using UnityEngine;
 
-namespace VoxelGameEngine.Camera
+namespace VoxelGameEngine.ThirdPerson
 {
     [Serializable]
     public struct MainEntityCameraComponent : IComponentData
