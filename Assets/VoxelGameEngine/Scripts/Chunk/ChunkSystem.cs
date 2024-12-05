@@ -97,11 +97,6 @@ namespace VoxelGameEngine.Chunk
             var chunkPositionHandle = chunkPositionJob.Schedule(length, 64);
             chunkPositionHandle.Complete();
 
-            foreach (var item in positionArray)
-            {
-                //Debug.Log($"{item}");
-            }
-
             NativeArray<Entity> chunkArray = CollectionHelper.CreateNativeArray<Entity>(positionArray.Length, state.WorldUpdateAllocator);
 
             entityManager.Instantiate(chunk.ChunkPrefab, chunkArray);
@@ -122,7 +117,7 @@ namespace VoxelGameEngine.Chunk
             state.Enabled = false;
         }
         [BurstCompile]
-        private struct ChunkPositionParallelJob : IJobParallelFor
+        public struct ChunkPositionParallelJob : IJobParallelFor
         {
             public NativeArray<int3> PositionArray;
 
@@ -169,6 +164,8 @@ namespace VoxelGameEngine.Chunk
         private EntityManager entityManager;
         private EntityCommandBuffer ecb;
         private bool isOnEdge;
+        private int3 nearest;
+        private float minDistance;
         [BurstCompile]
         void OnCreate(ref SystemState state)
         {
@@ -179,72 +176,119 @@ namespace VoxelGameEngine.Chunk
         [BurstCompile]
         void OnUpdate(ref SystemState state)
         {
-            //ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
-            //ref WorldComponent world = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
+            ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
+            ref WorldComponent world = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
 
-            //Entity chunkParentEntity = SystemAPI.GetSingletonEntity<ChunkParentTag>();
+            NativeList<int3> chunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
 
-            //DynamicBuffer<Child> childBuffer = entityManager.GetBuffer<Child>(chunkParentEntity);
-            //NativeArray<int3> childPositionArray = CollectionHelper.CreateNativeArray<int3>(childBuffer.Length, state.WorldUpdateAllocator);
+            state.CompleteDependency();
+            var chunkPositionJob = new ChunkPositionListJob
+            {
+                ChunkPositionList = chunkPositionList,
+            };
+            var chunkPositionListHandle = chunkPositionJob.Schedule(state.Dependency);
+            state.Dependency = chunkPositionListHandle;
+            chunkPositionListHandle.Complete();
 
-            //state.CompleteDependency();
-            //var childPositionJob = new childChunkPositionJob
+            Entity characterEntity = SystemAPI.GetSingletonEntity<PlayerTagComponent>();
+
+            LocalTransform characterTransform = entityManager.GetComponentData<LocalTransform>(characterEntity);
+
+            NativeArray<float> distanceChunkPositionArray = CollectionHelper.CreateNativeArray<float>(chunkPositionList.Length, state.WorldUpdateAllocator);
+
+            var distanceChunkPositionJob = new DistanceChunkPositionJob
+            {
+                ChunkPositionArray = chunkPositionList.AsArray(),
+                CharacterPosition = characterTransform.Position,
+                Distance = distanceChunkPositionArray
+            };
+            var distanceChunkPositionHandle = distanceChunkPositionJob.Schedule(chunkPositionList.Length, 64);
+            distanceChunkPositionHandle.Complete();
+
+            NativeArray<int3> nearest = CollectionHelper.CreateNativeArray<int3>(1, state.WorldUpdateAllocator);
+            nearest[0] = chunkPositionList[0];
+            NativeArray<float> minDistance = CollectionHelper.CreateNativeArray<float>(1, state.WorldUpdateAllocator);
+            minDistance[0] = distanceChunkPositionArray[0];
+
+            //for (int i = 1; i < distanceChunkPositionArray.Length; i++)
             //{
-            //    childPositionArray = childPositionArray,
-            //};
-            //var childHandle = childPositionJob.Schedule(state.Dependency);
-            //state.Dependency = childHandle;
-            //childHandle.Complete();
-
-            //Entity characterEntity = SystemAPI.GetSingletonEntity<PlayerTagComponent>();
-
-            //LocalTransform characterTransform = entityManager.GetComponentData<LocalTransform>(characterEntity);
-
-            //var isOnEdgeJob = new IsOnEdgeParallelJob
-            //{
-
-            //};
-            //var edgeHandle = isOnEdgeJob.Schedule(1,64);
-            //Debug.Log($"Player is on edge: {isOnEdge}");
-
+            //    if (distanceChunkPositionArray[i] < minDistance)
+            //    {
+            //        minDistance = distanceChunkPositionArray[i];
+            //        nearest = chunkPositionList[i];
+            //    }
+            //}
             
+            var nearestChunkPositionJob = new NearestChunkPositionJob
+            {
+                NearestPosition = nearest,
+                MinDistance = minDistance,
+                Distance = distanceChunkPositionArray,
+                ChunkPositionArray = chunkPositionList.AsArray(),
+            };
+            var nearestChunkPositionHandle = nearestChunkPositionJob.Schedule(distanceChunkPositionArray.Length, 64);
+            nearestChunkPositionHandle.Complete();
+            
+            minDistance.Dispose();
+            nearest.Dispose();
+            distanceChunkPositionArray.Dispose();
+            chunkPositionList.Dispose();
         }
 
         [BurstCompile]
         [WithAll(typeof(ChunkTag))]
-        private partial struct childChunkPositionJob : IJobEntity
+        private partial struct ChunkPositionListJob : IJobEntity
         {
-            private int index;
-            public NativeArray<int3> childPositionArray;
+            public NativeList<int3> ChunkPositionList;
             [BurstCompile]
             public void Execute([ChunkIndexInQuery] int chunkIndex, ref LocalTransform transform)
             {
-                childPositionArray[index] = (int3)transform.Position;
-                index++;
+                ChunkPositionList.Add((int3)transform.Position);
             }
         }
 
         [BurstCompile]
-        private struct GetChunkPositionParallelJob : IJobParallelFor
+        private struct DistanceChunkPositionJob : IJobParallelFor
+        {
+            public NativeArray<int3> ChunkPositionArray;
+            public float3 CharacterPosition;
+            public NativeArray<float> Distance;
+            [BurstCompile]
+            public void Execute(int index)
+            {
+                Distance[index] = math.distance(ChunkPositionArray[index], CharacterPosition);
+            }
+        }
+        [BurstCompile]
+        private struct NearestChunkPositionJob : IJobParallelFor
+        {
+            public NativeArray<int3> NearestPosition;
+            public NativeArray<float> MinDistance;
+            public NativeArray<float> Distance;
+            public NativeArray<int3> ChunkPositionArray;
+            [BurstCompile]
+            public void Execute(int index)
+            {
+                if (Distance[index] < MinDistance[0])
+                {
+                    MinDistance[0] = Distance[index];
+                    NearestPosition[0] = ChunkPositionArray[index];
+                }
+            }
+        }
+
+        [BurstCompile]
+        private struct IsOnEdgeParallelJob : IJob
         {
             public NativeArray<int3> ChildPositionArray;
             public int ChunkSize;
             public int3 CharacterPosition;
             public bool IsOnEdge;
             [BurstCompile]
-            public void Execute(int index)
+            public void Execute()
             {
                 int3 chunkPosition = WorldHelper.GetChunkPositionFromCoordinate(ChildPositionArray, CharacterPosition);
                 IsOnEdge = WorldHelper.IsOnEdge(ChunkSize, chunkPosition, CharacterPosition);
-            }
-        }
-
-        [BurstCompile]
-        private struct IsOnEdgeParallelJob : IJobParallelFor
-        {
-            public void Execute(int index)
-            {
-                throw new NotImplementedException();
             }
         }
     }

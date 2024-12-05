@@ -80,24 +80,6 @@ namespace VoxelGameEngine.World
             return chunkToCreate;
         }
 
-        public static void TestLoop(WorldComponent world, int3 originPosition)
-        {
-            int startX = (int)originPosition.x - world.ChunkRange * world.ChunkSize;
-            int endX = (int)originPosition.x + world.ChunkRange * world.ChunkSize;
-
-            int startZ = (int)originPosition.z - world.ChunkRange * world.ChunkSize;
-            int endZ = (int)originPosition.z + world.ChunkRange * world.ChunkSize;
-
-            for (int i = 0; i < ((endX - startX) / world.ChunkSize + 1); i++)
-            {
-                Debug.Log($"Loop 1: {startX + (i * world.ChunkSize)}");
-            }
-            for (int x = startX; x <= endX; x+= world.ChunkSize)
-            {
-                Debug.Log($"Loop 2: {x}");
-            }
-        }
-
 
     }
 
