@@ -92,7 +92,6 @@ namespace VoxelGameEngine.Chunk
                 EndX = endX,
                 StartZ = startZ,
                 EndZ = endZ,
-                CountZ = countZ,
                 World = world,
             };
             var chunkPositionHandle = chunkPositionJob.Schedule(length, 64);
@@ -132,7 +131,6 @@ namespace VoxelGameEngine.Chunk
             public int EndX;
             public int StartZ;
             public int EndZ;
-            public int CountZ;
             
             [BurstCompile]
             public void Execute(int index)
