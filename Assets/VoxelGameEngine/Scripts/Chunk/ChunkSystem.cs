@@ -7,14 +7,11 @@ using Unity.Transforms;
 using static VoxelGameEngine.Chunk.ChunkSystem;
 using VoxelGameEngine.World;
 using VoxelGameEngine.Ticks;
-using System;
 using Unity.Burst;
 using VoxelGameEngine.Player;
 using UnityEngine.Jobs;
 using Unity.Jobs;
-using System.Threading;
-using static UnityEditor.Experimental.AssetDatabaseExperimental.AssetDatabaseCounters;
-using Unity.Entities.UniversalDelegates;
+using UnityEngine.UIElements;
 
 namespace VoxelGameEngine.Chunk
 {
@@ -26,7 +23,7 @@ namespace VoxelGameEngine.Chunk
         private Entity chunkParentEntity;
         private EntityCommandBuffer ecb;
 
-        public struct LastPositionComponent : IComponentData
+        public struct LastCenterPositionComponent : IComponentData
         {
             public int3 Value;
         }
@@ -48,8 +45,8 @@ namespace VoxelGameEngine.Chunk
             entityManager = state.EntityManager;
 
             Entity lastPositionEntity = entityManager.CreateEntity();
-            entityManager.SetName(lastPositionEntity, $"LastPosition");
-            entityManager.AddComponentData(lastPositionEntity, new LastPositionComponent());
+            entityManager.SetName(lastPositionEntity, $"LastCenterPosition");
+            entityManager.AddComponentData(lastPositionEntity, new LastCenterPositionComponent());
 
             chunkParentEntity = entityManager.CreateEntity();
             entityManager.SetName(chunkParentEntity, $"ChunkParent");
@@ -63,7 +60,7 @@ namespace VoxelGameEngine.Chunk
         {
             ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
 
-            ref LastPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastPositionComponent>().ValueRW;
+            ref LastCenterPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastCenterPositionComponent>().ValueRW;
             ref WorldComponent world = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
             ref ChunkComponent chunk = ref SystemAPI.GetSingletonRW<ChunkComponent>().ValueRW;
             ref DateTimeTicksComponent dateTimeTicks = ref SystemAPI.GetSingletonRW<DateTimeTicksComponent>().ValueRW;
@@ -73,28 +70,20 @@ namespace VoxelGameEngine.Chunk
 
             lastPosition.Value = random.NextInt3(chunk.MinimumPosition, chunk.MaximumPosition) * world.ChunkSize;
 
-            int startX = (int)lastPosition.Value.x - world.ChunkRange * world.ChunkSize;
-            int endX = (int)lastPosition.Value.x + world.ChunkRange * world.ChunkSize;
-            int startZ = (int)lastPosition.Value.z - world.ChunkRange * world.ChunkSize;
-            int endZ = (int)lastPosition.Value.z + world.ChunkRange * world.ChunkSize;
+            WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, lastPosition.Value);
 
-            int countX = (endX - startX) / world.ChunkSize + 1;
-            int countZ = (endZ - startZ) / world.ChunkSize + 1;
-
-            int length = countX * countZ;
-
-            NativeArray<int3> positionArray = CollectionHelper.CreateNativeArray<int3>(length, state.WorldUpdateAllocator);
+            NativeArray<int3> positionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, state.WorldUpdateAllocator);
 
             var chunkPositionJob = new ChunkPositionParallelJob
             {
                 PositionArray = positionArray,
-                StartX = startX,
-                EndX = endX,
-                StartZ = startZ,
-                EndZ = endZ,
+                StartX =chunkData.StartX,
+                EndX = chunkData.EndX,
+                StartZ = chunkData.StartZ,
+                EndZ = chunkData.EndZ,
                 World = world,
             };
-            var chunkPositionHandle = chunkPositionJob.Schedule(length, 64);
+            var chunkPositionHandle = chunkPositionJob.Schedule(chunkData.Length, 64);
             chunkPositionHandle.Complete();
 
             NativeArray<Entity> chunkArray = CollectionHelper.CreateNativeArray<Entity>(positionArray.Length, state.WorldUpdateAllocator);
@@ -119,14 +108,19 @@ namespace VoxelGameEngine.Chunk
         [BurstCompile]
         public struct ChunkPositionParallelJob : IJobParallelFor
         {
+            [WriteOnly]
             public NativeArray<int3> PositionArray;
-
+            [ReadOnly]
             public WorldComponent World;
+            [ReadOnly]
             public int StartX;
+            [ReadOnly]
             public int EndX;
+            [ReadOnly]
             public int StartZ;
+            [ReadOnly]
             public int EndZ;
-            
+
             [BurstCompile]
             public void Execute(int index)
             {
@@ -141,15 +135,18 @@ namespace VoxelGameEngine.Chunk
         private struct ChunkParallelJob : IJobParallelFor
         {
             public EntityCommandBuffer.ParallelWriter Ecb;
+            [ReadOnly]
             public NativeArray<Entity> chunkArray;
+            [ReadOnly]
             public NativeArray<int3> positionArray;
+            [ReadOnly]
             public Entity Parent;
 
             [BurstCompile]
             public void Execute(int index)
             {
-                Ecb.AddComponent(index, chunkArray[index], new ChunkTag{});
-                Ecb.AddComponent(index, chunkArray[index], new Parent { Value = Parent});
+                Ecb.AddComponent(index, chunkArray[index], new ChunkTag { });
+                Ecb.AddComponent(index, chunkArray[index], new Parent { Value = Parent });
                 Ecb.AddComponent(index, chunkArray[index], LocalTransform.FromPosition(positionArray[index]));
             }
         }
@@ -163,13 +160,10 @@ namespace VoxelGameEngine.Chunk
     {
         private EntityManager entityManager;
         private EntityCommandBuffer ecb;
-        private bool isOnEdge;
-        private int3 nearest;
-        private float minDistance;
         [BurstCompile]
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<ChunkSystem.LastPositionComponent>();
+            state.RequireForUpdate<LastCenterPositionComponent>();
             state.RequireForUpdate<PlayerTagComponent>();
             entityManager = state.EntityManager;
         }
@@ -177,7 +171,19 @@ namespace VoxelGameEngine.Chunk
         void OnUpdate(ref SystemState state)
         {
             ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
+
+            Entity characterEntity = SystemAPI.GetSingletonEntity<PlayerTagComponent>();
+
+            LocalTransform characterTransform = entityManager.GetComponentData<LocalTransform>(characterEntity);
             ref WorldComponent world = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
+            ref LastCenterPositionComponent centerPosition = ref SystemAPI.GetSingletonRW<LastCenterPositionComponent>().ValueRW;
+
+            bool isOnEdge = WorldHelper.IsOnEdge(world.ChunkSize, centerPosition.Value, (int3)characterTransform.Position);
+
+            if (isOnEdge)
+            {
+                return;
+            }
 
             NativeList<int3> chunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
 
@@ -189,10 +195,6 @@ namespace VoxelGameEngine.Chunk
             var chunkPositionListHandle = chunkPositionJob.Schedule(state.Dependency);
             state.Dependency = chunkPositionListHandle;
             chunkPositionListHandle.Complete();
-
-            Entity characterEntity = SystemAPI.GetSingletonEntity<PlayerTagComponent>();
-
-            LocalTransform characterTransform = entityManager.GetComponentData<LocalTransform>(characterEntity);
 
             NativeArray<float> distanceChunkPositionArray = CollectionHelper.CreateNativeArray<float>(chunkPositionList.Length, state.WorldUpdateAllocator);
 
@@ -207,18 +209,10 @@ namespace VoxelGameEngine.Chunk
 
             NativeArray<int3> nearest = CollectionHelper.CreateNativeArray<int3>(1, state.WorldUpdateAllocator);
             nearest[0] = chunkPositionList[0];
+
             NativeArray<float> minDistance = CollectionHelper.CreateNativeArray<float>(1, state.WorldUpdateAllocator);
             minDistance[0] = distanceChunkPositionArray[0];
 
-            //for (int i = 1; i < distanceChunkPositionArray.Length; i++)
-            //{
-            //    if (distanceChunkPositionArray[i] < minDistance)
-            //    {
-            //        minDistance = distanceChunkPositionArray[i];
-            //        nearest = chunkPositionList[i];
-            //    }
-            //}
-            
             var nearestChunkPositionJob = new NearestChunkPositionJob
             {
                 NearestPosition = nearest,
@@ -228,7 +222,30 @@ namespace VoxelGameEngine.Chunk
             };
             var nearestChunkPositionHandle = nearestChunkPositionJob.Schedule(distanceChunkPositionArray.Length, 64);
             nearestChunkPositionHandle.Complete();
-            
+            Debug.Log($"Generate new Center chunk at {nearest[0]}");
+
+            WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, nearest[0]);
+
+            var newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, state.WorldUpdateAllocator);
+
+            var newChunkPositionJob = new ChunkSystem.ChunkPositionParallelJob
+            {
+                World = world,
+                PositionArray = newChunkPositionArray,
+                StartX = chunkData.StartX,
+                EndX = chunkData.EndX,
+                StartZ = chunkData.StartZ,
+                EndZ = chunkData.EndZ,
+            };
+            var newChunkPositionHandle = newChunkPositionJob.Schedule(newChunkPositionArray.Length, 64);
+            newChunkPositionHandle.Complete();
+
+            foreach ( var chunkPosition in newChunkPositionArray )
+            {
+                Debug.Log($"Generate new chunk at {chunkPosition}");
+            }    
+
+            newChunkPositionArray.Dispose();
             minDistance.Dispose();
             nearest.Dispose();
             distanceChunkPositionArray.Dispose();
@@ -239,6 +256,7 @@ namespace VoxelGameEngine.Chunk
         [WithAll(typeof(ChunkTag))]
         private partial struct ChunkPositionListJob : IJobEntity
         {
+            [WriteOnly]
             public NativeList<int3> ChunkPositionList;
             [BurstCompile]
             public void Execute([ChunkIndexInQuery] int chunkIndex, ref LocalTransform transform)
@@ -250,8 +268,11 @@ namespace VoxelGameEngine.Chunk
         [BurstCompile]
         private struct DistanceChunkPositionJob : IJobParallelFor
         {
+            [ReadOnly]
             public NativeArray<int3> ChunkPositionArray;
+            [ReadOnly]
             public float3 CharacterPosition;
+            [WriteOnly]
             public NativeArray<float> Distance;
             [BurstCompile]
             public void Execute(int index)
@@ -262,9 +283,12 @@ namespace VoxelGameEngine.Chunk
         [BurstCompile]
         private struct NearestChunkPositionJob : IJobParallelFor
         {
+            [WriteOnly]
             public NativeArray<int3> NearestPosition;
             public NativeArray<float> MinDistance;
+            [ReadOnly]
             public NativeArray<float> Distance;
+            [ReadOnly]
             public NativeArray<int3> ChunkPositionArray;
             [BurstCompile]
             public void Execute(int index)
@@ -277,19 +301,6 @@ namespace VoxelGameEngine.Chunk
             }
         }
 
-        [BurstCompile]
-        private struct IsOnEdgeParallelJob : IJob
-        {
-            public NativeArray<int3> ChildPositionArray;
-            public int ChunkSize;
-            public int3 CharacterPosition;
-            public bool IsOnEdge;
-            [BurstCompile]
-            public void Execute()
-            {
-                int3 chunkPosition = WorldHelper.GetChunkPositionFromCoordinate(ChildPositionArray, CharacterPosition);
-                IsOnEdge = WorldHelper.IsOnEdge(ChunkSize, chunkPosition, CharacterPosition);
-            }
-        }
+        
     }
 }
