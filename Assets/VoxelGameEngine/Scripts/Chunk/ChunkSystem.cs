@@ -222,11 +222,11 @@ namespace VoxelGameEngine.Chunk
             };
             var nearestChunkPositionHandle = nearestChunkPositionJob.Schedule(distanceChunkPositionArray.Length, 64);
             nearestChunkPositionHandle.Complete();
-            Debug.Log($"Generate new Center chunk at {nearest[0]}");
+            //Debug.Log($"Generate new Center chunk at {nearest[0]}");
 
             WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, nearest[0]);
 
-            var newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, state.WorldUpdateAllocator);
+            NativeArray<int3> newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, state.WorldUpdateAllocator);
 
             var newChunkPositionJob = new ChunkSystem.ChunkPositionParallelJob
             {
@@ -240,11 +240,34 @@ namespace VoxelGameEngine.Chunk
             var newChunkPositionHandle = newChunkPositionJob.Schedule(newChunkPositionArray.Length, 64);
             newChunkPositionHandle.Complete();
 
-            foreach ( var chunkPosition in newChunkPositionArray )
+            //for (int i = 0; i < newChunkPositionArray.Length; i++)
+            //{
+            //    Debug.Log($"{newChunkPositionArray[i]}");
+            //}
+            NativeList<int3> neededChunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
+            NativeList<int3> unneededChunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
+            var neededChunkPositionJob = new NeededChunkPositionJob
             {
-                Debug.Log($"Generate new chunk at {chunkPosition}");
-            }    
+                OldChunkPositionArray = chunkPositionList.AsArray(),
+                NewChunkPositionArray = newChunkPositionArray,
+                NeededChunkPositionList = neededChunkPositionList.AsParallelWriter(),
+                UnneededChunkPositionList = unneededChunkPositionList.AsParallelWriter()
+            };
+            var neededChunkPositionHandle = neededChunkPositionJob.Schedule(newChunkPositionArray.Length, 64);
+            neededChunkPositionHandle.Complete();
 
+            foreach (var item in neededChunkPositionList)
+            {
+                Debug.Log($"Need {item}");
+            }
+
+            foreach (var item in unneededChunkPositionList)
+            {
+                Debug.Log($"Unneed {item}");
+            }
+
+            unneededChunkPositionList.Dispose();
+            neededChunkPositionList.Dispose();
             newChunkPositionArray.Dispose();
             minDistance.Dispose();
             nearest.Dispose();
@@ -301,6 +324,30 @@ namespace VoxelGameEngine.Chunk
             }
         }
 
-        
+        [BurstCompile]
+        private struct NeededChunkPositionJob : IJobParallelFor
+        {
+            [ReadOnly]
+            public NativeArray<int3> OldChunkPositionArray;
+            [ReadOnly]
+            public NativeArray<int3> NewChunkPositionArray;
+            [WriteOnly]
+            public NativeList<int3>.ParallelWriter NeededChunkPositionList;
+            [WriteOnly]
+            public NativeList<int3>.ParallelWriter UnneededChunkPositionList;
+            [BurstCompile]
+            public void Execute(int index)
+            {
+                if (!OldChunkPositionArray.Contains(NewChunkPositionArray[index]))
+                {
+                    NeededChunkPositionList.AddNoResize(NewChunkPositionArray[index]);
+                }
+                if (!NewChunkPositionArray.Contains(OldChunkPositionArray[index]))
+                {
+                    UnneededChunkPositionList.AddNoResize(OldChunkPositionArray[index]);
+                }
+            }
+        }
+
     }
 }
