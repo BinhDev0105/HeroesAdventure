@@ -25,7 +25,7 @@ namespace VoxelGameEngine.Player
         void OnUpdate(ref SystemState state)
         {
             /*-- Get component --*/
-            ref LastPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastPositionComponent>().ValueRW;
+            ref LastCenterPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastCenterPositionComponent>().ValueRW;
             ref PlayerComponent player = ref SystemAPI.GetSingletonRW<PlayerComponent>().ValueRW;
 
             EntityCommandBuffer ecb = SystemAPI.GetSingletonRW<EndSimulationEntityCommandBufferSystem.Singleton>().ValueRW.CreateCommandBuffer(state.WorldUnmanaged);

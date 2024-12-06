@@ -48,14 +48,23 @@ namespace VoxelGameEngine.World
         public static bool IsOnEdge(int chunkSize, int3 chunkPosition, int3 position)
         {
             int3 blockPosition = GetBlockPositionInChunkCoordinate(chunkPosition, position);
-            if (Mathf.Abs(blockPosition.x) < (chunkSize / 2) - 1 && Mathf.Abs(blockPosition.z) < (chunkSize / 2) - 1)
+            if (Mathf.Abs(blockPosition.x) < chunkSize - 1 && Mathf.Abs(blockPosition.z) < chunkSize - 1)
             {
                 return true;
             }
             return false;
         }
 
-        public static NativeArray<int3> GetChunkPositionAroundOriginPosition(WorldComponent world, int3 originPosition)
+        public struct ChunkData
+        {
+            public int StartX;
+            public int EndX;
+            public int StartZ;
+            public int EndZ;
+            public int Length;
+        }
+
+        public static ChunkData SetupChunkData(WorldComponent world, int3 originPosition)
         {
             int startX = (int)originPosition.x - world.ChunkRange * world.ChunkSize;
             int endX = (int)originPosition.x + world.ChunkRange * world.ChunkSize;
@@ -64,20 +73,14 @@ namespace VoxelGameEngine.World
             int endZ = (int)originPosition.z + world.ChunkRange * world.ChunkSize;
 
             int length = ((endX - startX) / world.ChunkSize + 1) * ((endZ - startZ) / world.ChunkSize + 1);
-            int count = 0;
 
-            NativeArray<int3> chunkToCreate = new NativeArray<int3>(length, Allocator.Temp);
-
-            for (int x = startX; x <= endX; x += world.ChunkSize)
-            {
-                for (int z = startZ; z <= endZ; z += world.ChunkSize)
-                {
-                    int3 chunkPosition = GetChunkPositionFromCoordinate(world, new int3(x, 0, z));
-                    chunkToCreate[count] = chunkPosition;
-                    count++;
-                }
-            }
-            return chunkToCreate;
+            ChunkData data = new ChunkData();
+            data.StartX = startX;
+            data.EndX = endX;
+            data.StartZ = startZ;
+            data.EndZ = endZ;
+            data.Length = length;
+            return data;
         }
 
 
