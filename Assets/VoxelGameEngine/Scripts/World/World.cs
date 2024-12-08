@@ -1,11 +1,12 @@
 using Unity.Entities;
 
-namespace VoxelGameEngine.World
+namespace VoxelGameEngine.WorldECS
 {
-    public struct WorldComponent : IComponentData
+    public struct World : IComponentData
     {
         public int ChunkRange;
         public int ChunkSize;
         public int ChunkHeight;
+        public int NumberOfChunk;
     }
 }

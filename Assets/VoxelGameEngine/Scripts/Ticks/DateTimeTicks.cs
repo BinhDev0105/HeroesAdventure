@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace VoxelGameEngine.Ticks
 {
-    public struct DateTimeTicksComponent : IComponentData
+    public struct DateTimeTicks : IComponentData
     {
         public bool Active;
         public long Value;

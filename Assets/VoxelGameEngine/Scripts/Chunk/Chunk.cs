@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace VoxelGameEngine.Chunk
 {
-    public struct ChunkComponent : IComponentData
+    public struct Chunk : IComponentData
     {
         public Entity ChunkPrefab;
         public int3 MinimumPosition;

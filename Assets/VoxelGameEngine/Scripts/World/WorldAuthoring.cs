@@ -1,7 +1,8 @@
 using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
-namespace VoxelGameEngine.World
+namespace VoxelGameEngine.WorldECS
 {
     public class WorldAuthoring : MonoBehaviour
     {
@@ -14,11 +15,12 @@ namespace VoxelGameEngine.World
             public override void Bake(WorldAuthoring authoring)
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
-                AddComponent(entity, new WorldComponent
+                AddComponent(entity, new World
                 {
                     ChunkRange = authoring.ChunkRange,
                     ChunkSize = authoring.ChunkSize,
-                    ChunkHeight = authoring.ChunkHeight
+                    ChunkHeight = authoring.ChunkHeight,
+                    NumberOfChunk = (int)math.pow(2 * authoring.ChunkRange + 1,2)
                 });
             }
         }

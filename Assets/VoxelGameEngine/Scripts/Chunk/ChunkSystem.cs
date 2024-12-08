@@ -5,13 +5,15 @@ using Debug = UnityEngine.Debug;
 using Unity.Collections;
 using Unity.Transforms;
 using static VoxelGameEngine.Chunk.ChunkSystem;
-using VoxelGameEngine.World;
+using World = VoxelGameEngine.WorldECS.World;
+using ChunkData = VoxelGameEngine.WorldECS.WorldHelper.ChunkData;
+using WorldHelper = VoxelGameEngine.WorldECS.WorldHelper;
 using VoxelGameEngine.Ticks;
 using Unity.Burst;
 using VoxelGameEngine.Player;
 using UnityEngine.Jobs;
 using Unity.Jobs;
-using UnityEngine.UIElements;
+using UnityEngine.Scripting;
 
 namespace VoxelGameEngine.Chunk
 {
@@ -23,30 +25,30 @@ namespace VoxelGameEngine.Chunk
         private Entity chunkParentEntity;
         private EntityCommandBuffer ecb;
 
-        public struct LastCenterPositionComponent : IComponentData
+        public static readonly SharedStatic<int> NumberOfChunk = SharedStatic<int>.GetOrCreate<ChunkSystem>();
+
+        public struct LastCenterPosition : IComponentData
         {
             public int3 Value;
         }
 
         public struct ChunkParentTag : IComponentData
         {
-
         }
 
         public struct ChunkTag : IComponentData
         {
-
         }
 
         [BurstCompile]
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<ChunkComponent>();
+            state.RequireForUpdate<Chunk>();
             entityManager = state.EntityManager;
 
             Entity lastPositionEntity = entityManager.CreateEntity();
             entityManager.SetName(lastPositionEntity, $"LastCenterPosition");
-            entityManager.AddComponentData(lastPositionEntity, new LastCenterPositionComponent());
+            entityManager.AddComponentData(lastPositionEntity, new LastCenterPosition());
 
             chunkParentEntity = entityManager.CreateEntity();
             entityManager.SetName(chunkParentEntity, $"ChunkParent");
@@ -60,21 +62,24 @@ namespace VoxelGameEngine.Chunk
         {
             ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
 
-            ref LastCenterPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastCenterPositionComponent>().ValueRW;
-            ref WorldComponent world = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
-            ref ChunkComponent chunk = ref SystemAPI.GetSingletonRW<ChunkComponent>().ValueRW;
-            ref DateTimeTicksComponent dateTimeTicks = ref SystemAPI.GetSingletonRW<DateTimeTicksComponent>().ValueRW;
+            ref LastCenterPosition lastPosition = ref SystemAPI.GetSingletonRW<LastCenterPosition>().ValueRW;
+            ref World world = ref SystemAPI.GetSingletonRW<World>().ValueRW;
+            ref Chunk chunk = ref SystemAPI.GetSingletonRW<Chunk>().ValueRW;
+            ref DateTimeTicks dateTimeTicks = ref SystemAPI.GetSingletonRW<DateTimeTicks>().ValueRW;
+            
+            NumberOfChunk.Data = world.NumberOfChunk;
+            //Debug.Log($"{NumberOfChunk.Data}");
 
             random.InitState((uint)dateTimeTicks.Value);
             dateTimeTicks.Active = false;
 
             lastPosition.Value = random.NextInt3(chunk.MinimumPosition, chunk.MaximumPosition) * world.ChunkSize;
 
-            WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, lastPosition.Value);
+            ChunkData chunkData = WorldHelper.SetupChunkData(world, lastPosition.Value);
 
-            NativeArray<int3> positionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, state.WorldUpdateAllocator);
+            NativeArray<int3> positionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, Allocator.TempJob);
 
-            var chunkPositionJob = new ChunkPositionParallelJob
+            var chunkPositionJob = new ChunkPositionJob
             {
                 PositionArray = positionArray,
                 StartX =chunkData.StartX,
@@ -86,32 +91,32 @@ namespace VoxelGameEngine.Chunk
             var chunkPositionHandle = chunkPositionJob.Schedule(chunkData.Length, 64);
             chunkPositionHandle.Complete();
 
-            NativeArray<Entity> chunkArray = CollectionHelper.CreateNativeArray<Entity>(positionArray.Length, state.WorldUpdateAllocator);
+            NativeArray<Entity> chunkArray = CollectionHelper.CreateNativeArray<Entity>(positionArray.Length, Allocator.TempJob);
 
             entityManager.Instantiate(chunk.ChunkPrefab, chunkArray);
 
-            var chunkParallelJob = new ChunkParallelJob
+            var chunkParallelJob = new ChunkJob
             {
                 Ecb = ecb.AsParallelWriter(),
                 Parent = chunkParentEntity,
-                chunkArray = chunkArray,
-                positionArray = CollectionHelper.CreateNativeArray<int3>(positionArray, state.WorldUpdateAllocator),
+                ChunkArray = chunkArray,
+                PositionArray = positionArray,
             };
             var handle = chunkParallelJob.Schedule(chunkArray.Length, 64);
             handle.Complete();
 
-            chunkArray.Dispose();
+            
             positionArray.Dispose();
-
+            chunkArray.Dispose();
             state.Enabled = false;
         }
         [BurstCompile]
-        public struct ChunkPositionParallelJob : IJobParallelFor
+        public struct ChunkPositionJob : IJobParallelFor
         {
             [WriteOnly]
             public NativeArray<int3> PositionArray;
             [ReadOnly]
-            public WorldComponent World;
+            public World World;
             [ReadOnly]
             public int StartX;
             [ReadOnly]
@@ -132,22 +137,22 @@ namespace VoxelGameEngine.Chunk
             }
         }
         [BurstCompile]
-        private struct ChunkParallelJob : IJobParallelFor
+        private struct ChunkJob : IJobParallelFor
         {
             public EntityCommandBuffer.ParallelWriter Ecb;
             [ReadOnly]
-            public NativeArray<Entity> chunkArray;
+            public NativeArray<Entity> ChunkArray;
             [ReadOnly]
-            public NativeArray<int3> positionArray;
+            public NativeArray<int3> PositionArray;
             [ReadOnly]
             public Entity Parent;
 
             [BurstCompile]
             public void Execute(int index)
             {
-                Ecb.AddComponent(index, chunkArray[index], new ChunkTag { });
-                Ecb.AddComponent(index, chunkArray[index], new Parent { Value = Parent });
-                Ecb.AddComponent(index, chunkArray[index], LocalTransform.FromPosition(positionArray[index]));
+                Ecb.AddComponent(index, ChunkArray[index], new ChunkTag { });
+                Ecb.AddComponent(index, ChunkArray[index], new Parent { Value = Parent });
+                Ecb.AddComponent(index, ChunkArray[index], LocalTransform.FromPosition(PositionArray[index]));
             }
         }
     }
@@ -160,23 +165,27 @@ namespace VoxelGameEngine.Chunk
     {
         private EntityManager entityManager;
         private EntityCommandBuffer ecb;
+
         [BurstCompile]
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<LastCenterPositionComponent>();
-            state.RequireForUpdate<PlayerTagComponent>();
+            state.RequireForUpdate<LastCenterPosition>();
+            state.RequireForUpdate<PlayerTag>();
+
             entityManager = state.EntityManager;
         }
+
         [BurstCompile]
         void OnUpdate(ref SystemState state)
         {
+            
             ecb = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
 
-            Entity characterEntity = SystemAPI.GetSingletonEntity<PlayerTagComponent>();
+            Entity characterEntity = SystemAPI.GetSingletonEntity<PlayerTag>();
 
             LocalTransform characterTransform = entityManager.GetComponentData<LocalTransform>(characterEntity);
-            ref WorldComponent world = ref SystemAPI.GetSingletonRW<WorldComponent>().ValueRW;
-            ref LastCenterPositionComponent centerPosition = ref SystemAPI.GetSingletonRW<LastCenterPositionComponent>().ValueRW;
+            ref World world = ref SystemAPI.GetSingletonRW<World>().ValueRW;
+            ref LastCenterPosition centerPosition = ref SystemAPI.GetSingletonRW<LastCenterPosition>().ValueRW;
 
             bool isOnEdge = WorldHelper.IsOnEdge(world.ChunkSize, centerPosition.Value, (int3)characterTransform.Position);
 
@@ -185,8 +194,7 @@ namespace VoxelGameEngine.Chunk
                 return;
             }
 
-            NativeList<int3> chunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
-
+            NativeList<int3> chunkPositionList = new(Allocator.TempJob);
             state.CompleteDependency();
             var chunkPositionJob = new ChunkPositionListJob
             {
@@ -194,41 +202,34 @@ namespace VoxelGameEngine.Chunk
             };
             var chunkPositionListHandle = chunkPositionJob.Schedule(state.Dependency);
             state.Dependency = chunkPositionListHandle;
-            chunkPositionListHandle.Complete();
+            state.Dependency.Complete();
 
-            NativeArray<float> distanceChunkPositionArray = CollectionHelper.CreateNativeArray<float>(chunkPositionList.Length, state.WorldUpdateAllocator);
-
+            NativeArray<float> distanceArray = CollectionHelper.CreateNativeArray<float>(chunkPositionList.Length, Allocator.TempJob);
             var distanceChunkPositionJob = new DistanceChunkPositionJob
             {
                 ChunkPositionArray = chunkPositionList.AsArray(),
                 CharacterPosition = characterTransform.Position,
-                Distance = distanceChunkPositionArray
+                Distance = distanceArray
             };
-            var distanceChunkPositionHandle = distanceChunkPositionJob.Schedule(chunkPositionList.Length, 64);
-            distanceChunkPositionHandle.Complete();
+            var distanceChunkPositionHandle = distanceChunkPositionJob.Schedule(chunkPositionList.Length, 64, state.Dependency);
+            state.Dependency = distanceChunkPositionHandle;
+            state.Dependency.Complete();
 
-            NativeArray<int3> nearest = CollectionHelper.CreateNativeArray<int3>(1, state.WorldUpdateAllocator);
-            nearest[0] = chunkPositionList[0];
-
-            NativeArray<float> minDistance = CollectionHelper.CreateNativeArray<float>(1, state.WorldUpdateAllocator);
-            minDistance[0] = distanceChunkPositionArray[0];
-
-            var nearestChunkPositionJob = new NearestChunkPositionJob
+            NativeArray<int> nearestChunkIndex = CollectionHelper.CreateNativeArray<int>(1, Allocator.TempJob); ;
+            var lastCenterChunkPositionJob = new LastCenterChunkPositionJob
             {
-                NearestPosition = nearest,
-                MinDistance = minDistance,
-                Distance = distanceChunkPositionArray,
-                ChunkPositionArray = chunkPositionList.AsArray(),
+                Distances = distanceArray,
+                NearestChunkIndex = nearestChunkIndex,
+
             };
-            var nearestChunkPositionHandle = nearestChunkPositionJob.Schedule(distanceChunkPositionArray.Length, 64);
-            nearestChunkPositionHandle.Complete();
-            //Debug.Log($"Generate new Center chunk at {nearest[0]}");
+            var lastCenterChunkPositionHandle = lastCenterChunkPositionJob.Schedule(state.Dependency);
+            state.Dependency = lastCenterChunkPositionHandle;
+            state.Dependency.Complete();
 
-            WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, nearest[0]);
+            WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, chunkPositionList.ElementAt(nearestChunkIndex[0]));
 
-            NativeArray<int3> newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, state.WorldUpdateAllocator);
-
-            var newChunkPositionJob = new ChunkSystem.ChunkPositionParallelJob
+            NativeArray<int3> newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, Allocator.TempJob);
+            var newChunkPositionJob = new ChunkPositionJob
             {
                 World = world,
                 PositionArray = newChunkPositionArray,
@@ -237,15 +238,15 @@ namespace VoxelGameEngine.Chunk
                 StartZ = chunkData.StartZ,
                 EndZ = chunkData.EndZ,
             };
-            var newChunkPositionHandle = newChunkPositionJob.Schedule(newChunkPositionArray.Length, 64);
-            newChunkPositionHandle.Complete();
+            var newChunkPositionHandle = newChunkPositionJob.Schedule(newChunkPositionArray.Length, 64, state.Dependency);
+            state.Dependency = newChunkPositionHandle;
+            state.Dependency.Complete();
 
-            //for (int i = 0; i < newChunkPositionArray.Length; i++)
-            //{
-            //    Debug.Log($"{newChunkPositionArray[i]}");
-            //}
-            NativeList<int3> neededChunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
-            NativeList<int3> unneededChunkPositionList = new NativeList<int3>(state.WorldUpdateAllocator);
+            NativeList<int3> neededChunkPositionList = new NativeList<int3>(Allocator.TempJob);
+            neededChunkPositionList.Capacity = newChunkPositionArray.Length;
+            NativeList<int3> unneededChunkPositionList = new NativeList<int3>(Allocator.TempJob);
+            unneededChunkPositionList.Capacity = chunkPositionList.Length;
+
             var neededChunkPositionJob = new NeededChunkPositionJob
             {
                 OldChunkPositionArray = chunkPositionList.AsArray(),
@@ -253,25 +254,26 @@ namespace VoxelGameEngine.Chunk
                 NeededChunkPositionList = neededChunkPositionList.AsParallelWriter(),
                 UnneededChunkPositionList = unneededChunkPositionList.AsParallelWriter()
             };
-            var neededChunkPositionHandle = neededChunkPositionJob.Schedule(newChunkPositionArray.Length, 64);
-            neededChunkPositionHandle.Complete();
+            var neededChunkPositionHandle = neededChunkPositionJob.Schedule(newChunkPositionArray.Length, 64, state.Dependency);
+            state.Dependency = neededChunkPositionHandle;
+            state.Dependency.Complete();
 
-            foreach (var item in neededChunkPositionList)
+            var chunkTransformJob = new ChunkTransformJob
             {
-                Debug.Log($"Need {item}");
-            }
+                NeededChunkPositionArray = neededChunkPositionList.AsArray(),
+                UnneededChunkPositionArray = unneededChunkPositionList.AsArray(),
+            };
+            var chunkTransformHandle = chunkTransformJob.Schedule(state.Dependency);
+            state.Dependency = chunkTransformHandle;
+            state.Dependency.Complete();
 
-            foreach (var item in unneededChunkPositionList)
-            {
-                Debug.Log($"Unneed {item}");
-            }
+            centerPosition.Value = chunkPositionList.ElementAt(nearestChunkIndex[0]);
 
             unneededChunkPositionList.Dispose();
             neededChunkPositionList.Dispose();
             newChunkPositionArray.Dispose();
-            minDistance.Dispose();
-            nearest.Dispose();
-            distanceChunkPositionArray.Dispose();
+            nearestChunkIndex.Dispose();
+            distanceArray.Dispose();
             chunkPositionList.Dispose();
         }
 
@@ -304,23 +306,26 @@ namespace VoxelGameEngine.Chunk
             }
         }
         [BurstCompile]
-        private struct NearestChunkPositionJob : IJobParallelFor
+        private struct LastCenterChunkPositionJob : IJob
         {
+            [ReadOnly]
+            public NativeArray<float> Distances;
             [WriteOnly]
-            public NativeArray<int3> NearestPosition;
-            public NativeArray<float> MinDistance;
-            [ReadOnly]
-            public NativeArray<float> Distance;
-            [ReadOnly]
-            public NativeArray<int3> ChunkPositionArray;
+            public NativeArray<int> NearestChunkIndex;
             [BurstCompile]
-            public void Execute(int index)
+            public void Execute()
             {
-                if (Distance[index] < MinDistance[0])
+                float minDistance = float.MaxValue;
+                int minIndex = -1;
+                for (int i = 0; i < Distances.Length; i++)
                 {
-                    MinDistance[0] = Distance[index];
-                    NearestPosition[0] = ChunkPositionArray[index];
+                    if (Distances[i] < minDistance)
+                    {
+                        minDistance = Distances[i];
+                        minIndex = i;
+                    }
                 }
+                NearestChunkIndex[0] = minIndex;
             }
         }
 
@@ -346,6 +351,32 @@ namespace VoxelGameEngine.Chunk
                 {
                     UnneededChunkPositionList.AddNoResize(OldChunkPositionArray[index]);
                 }
+            }
+        }
+
+        [BurstCompile]
+        private partial struct ChunkTransformJob : IJobEntity
+        {
+            [ReadOnly]
+            public NativeArray<int3> NeededChunkPositionArray;
+            [ReadOnly]
+            public NativeArray<int3> UnneededChunkPositionArray;
+            [BurstCompile]
+            public void Execute([ChunkIndexInQuery] int chunkIndex, ref LocalTransform transform)
+            {
+                NativeArray<float3> Position = CollectionHelper.CreateNativeArray<float3>(1, Allocator.Temp);
+                Position[0] = transform.Position;
+                for (int i = 0; i < UnneededChunkPositionArray.Length; i++)
+                {
+                    if (Position[0].x == UnneededChunkPositionArray[i].x
+                        && Position[0].y == UnneededChunkPositionArray[i].y
+                        && Position[0].z == UnneededChunkPositionArray[i].z)
+                    {
+                        Position[0] = NeededChunkPositionArray[i];
+                    }
+                }
+                transform.Position = Position[0];
+                Position.Dispose();
             }
         }
 

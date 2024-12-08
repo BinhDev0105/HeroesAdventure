@@ -6,11 +6,11 @@ using Unity.Mathematics;
 using UnityEngine;
 using VoxelGameEngine.Chunk;
 
-namespace VoxelGameEngine.World
+namespace VoxelGameEngine.WorldECS
 {
     public struct WorldHelper
     {
-        public static int3 GetChunkPositionFromCoordinate(WorldComponent world, int3 position)
+        public static int3 GetChunkPositionFromCoordinate(World world, int3 position)
         {
             return new int3(
                 Mathf.FloorToInt(position.x / world.ChunkSize) * world.ChunkSize,
@@ -64,7 +64,7 @@ namespace VoxelGameEngine.World
             public int Length;
         }
 
-        public static ChunkData SetupChunkData(WorldComponent world, int3 originPosition)
+        public static ChunkData SetupChunkData(World world, int3 originPosition)
         {
             int startX = (int)originPosition.x - world.ChunkRange * world.ChunkSize;
             int endX = (int)originPosition.x + world.ChunkRange * world.ChunkSize;

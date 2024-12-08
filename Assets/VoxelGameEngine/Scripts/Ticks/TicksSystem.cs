@@ -35,12 +35,12 @@ namespace VoxelGameEngine.Ticks
     {
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<DateTimeTicksComponent>();
+            state.RequireForUpdate<DateTimeTicks>();
         }
 
         void OnUpdate(ref SystemState state)
         {
-            ref DateTimeTicksComponent ticks = ref SystemAPI.GetSingletonRW<DateTimeTicksComponent>().ValueRW;
+            ref DateTimeTicks ticks = ref SystemAPI.GetSingletonRW<DateTimeTicks>().ValueRW;
             if (ticks.Active == false)
             {
                 return;

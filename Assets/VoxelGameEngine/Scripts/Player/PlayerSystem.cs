@@ -17,16 +17,15 @@ namespace VoxelGameEngine.Player
         [BurstCompile]
         void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<PlayerComponent>();
+            state.RequireForUpdate<Player>();
             entityManager = state.EntityManager;
         }
 
         [BurstCompile]
         void OnUpdate(ref SystemState state)
         {
-            /*-- Get component --*/
-            ref LastCenterPositionComponent lastPosition = ref SystemAPI.GetSingletonRW<LastCenterPositionComponent>().ValueRW;
-            ref PlayerComponent player = ref SystemAPI.GetSingletonRW<PlayerComponent>().ValueRW;
+            ref LastCenterPosition lastPosition = ref SystemAPI.GetSingletonRW<LastCenterPosition>().ValueRW;
+            ref Player player = ref SystemAPI.GetSingletonRW<Player>().ValueRW;
 
             EntityCommandBuffer ecb = SystemAPI.GetSingletonRW<EndSimulationEntityCommandBufferSystem.Singleton>().ValueRW.CreateCommandBuffer(state.WorldUnmanaged);
             Entity characterEntity = ecb.Instantiate(player.CharacterPrefab);

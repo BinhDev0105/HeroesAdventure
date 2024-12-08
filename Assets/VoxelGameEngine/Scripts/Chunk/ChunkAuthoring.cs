@@ -15,7 +15,7 @@ namespace VoxelGameEngine.Chunk
             public override void Bake(ChunkAuthoring authoring)
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
-                AddComponent(entity, new ChunkComponent
+                AddComponent(entity, new Chunk
                 {
                     ChunkPrefab = GetEntity(authoring.ChunkPrefab,TransformUsageFlags.None),
                     MinimumPosition = authoring.MinimumPosition,

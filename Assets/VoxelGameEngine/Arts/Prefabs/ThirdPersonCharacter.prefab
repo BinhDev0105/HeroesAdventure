@@ -108,7 +108,7 @@ MonoBehaviour:
   JumpSpeed: 10
   Gravity:
     x: -0
-    y: 0
+    y: -30
     z: -0
   PreventAirAccelerationAgainstUngroundedHits: 1
   StepAndSlopeHandling:

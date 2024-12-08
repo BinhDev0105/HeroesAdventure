@@ -10,7 +10,7 @@ namespace VoxelGameEngine
             public override void Bake(PlayerTagAuthoring authoring)
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
-                AddComponent(entity, new PlayerTagComponent());
+                AddComponent(entity, new PlayerTag());
             }
         }
     }

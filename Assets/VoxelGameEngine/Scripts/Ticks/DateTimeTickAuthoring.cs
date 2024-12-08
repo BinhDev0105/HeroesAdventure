@@ -10,7 +10,7 @@ namespace VoxelGameEngine.Ticks
             public override void Bake(DateTimeTickAuthoring authoring)
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
-                AddComponent(entity, new DateTimeTicksComponent { Active = true});
+                AddComponent(entity, new DateTimeTicks { Active = true});
             }
         }
     }

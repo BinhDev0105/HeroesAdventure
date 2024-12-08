@@ -2,7 +2,7 @@ using Unity.Entities;
 
 namespace VoxelGameEngine
 {
-    public struct PlayerTagComponent : IComponentData
+    public struct PlayerTag : IComponentData
     {
     }
 }

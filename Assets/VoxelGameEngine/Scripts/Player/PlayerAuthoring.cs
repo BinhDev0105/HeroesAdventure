@@ -14,7 +14,7 @@ namespace VoxelGameEngine.Player
             public override void Bake(PlayerAuthoring authoring)
             {
                 Entity entity = GetEntity(TransformUsageFlags.None);
-                AddComponent(entity, new PlayerComponent
+                AddComponent(entity, new Player
                 {
                     PlayerPrefab = GetEntity(authoring.PlayerPrefab, TransformUsageFlags.None),
                     CharacterPrefab = GetEntity(authoring.CharacterPrefab, TransformUsageFlags.None),
