@@ -20,7 +20,6 @@ namespace VoxelGameEngine.WorldECS
                     ChunkRange = authoring.ChunkRange,
                     ChunkSize = authoring.ChunkSize,
                     ChunkHeight = authoring.ChunkHeight,
-                    NumberOfChunk = (int)math.pow(2 * authoring.ChunkRange + 1,2)
                 });
             }
         }

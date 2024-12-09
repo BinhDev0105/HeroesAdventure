@@ -7,6 +7,5 @@ namespace VoxelGameEngine.WorldECS
         public int ChunkRange;
         public int ChunkSize;
         public int ChunkHeight;
-        public int NumberOfChunk;
     }
 }
