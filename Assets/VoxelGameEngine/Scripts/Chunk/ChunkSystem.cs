@@ -25,7 +25,7 @@ namespace VoxelGameEngine.Chunk
         private Entity chunkParentEntity;
         private EntityCommandBuffer ecb;
 
-        public static readonly SharedStatic<int> NumberOfChunk = SharedStatic<int>.GetOrCreate<ChunkSystem>();
+        //public static readonly SharedStatic<int> NumberOfChunk = SharedStatic<int>.GetOrCreate<ChunkSystem>();
 
         public struct LastCenterPosition : IComponentData
         {
@@ -67,7 +67,7 @@ namespace VoxelGameEngine.Chunk
             ref Chunk chunk = ref SystemAPI.GetSingletonRW<Chunk>().ValueRW;
             ref DateTimeTicks dateTimeTicks = ref SystemAPI.GetSingletonRW<DateTimeTicks>().ValueRW;
             
-            NumberOfChunk.Data = world.NumberOfChunk;
+            //NumberOfChunk.Data = world.NumberOfChunk;
             //Debug.Log($"{NumberOfChunk.Data}");
 
             random.InitState((uint)dateTimeTicks.Value);
@@ -194,41 +194,43 @@ namespace VoxelGameEngine.Chunk
                 return;
             }
 
-            NativeList<int3> chunkPositionList = new(Allocator.TempJob);
+            NativeList<int3> chunkPositionList = new NativeList<int3>(Allocator.TempJob);
             state.CompleteDependency();
             var chunkPositionJob = new ChunkPositionListJob
             {
                 ChunkPositionList = chunkPositionList,
             };
-            var chunkPositionListHandle = chunkPositionJob.Schedule(state.Dependency);
-            state.Dependency = chunkPositionListHandle;
+            var chunkPositionHandle = chunkPositionJob.Schedule(state.Dependency);
+            state.Dependency = chunkPositionHandle;
             state.Dependency.Complete();
 
-            NativeArray<float> distanceArray = CollectionHelper.CreateNativeArray<float>(chunkPositionList.Length, Allocator.TempJob);
+            int chunkLength = chunkPositionList.Length;
+
+            NativeArray<float> distanceArray = CollectionHelper.CreateNativeArray<float>(chunkLength, Allocator.TempJob);
             var distanceChunkPositionJob = new DistanceChunkPositionJob
             {
                 ChunkPositionArray = chunkPositionList.AsArray(),
                 CharacterPosition = characterTransform.Position,
                 Distance = distanceArray
             };
-            var distanceChunkPositionHandle = distanceChunkPositionJob.Schedule(chunkPositionList.Length, 64, state.Dependency);
-            state.Dependency = distanceChunkPositionHandle;
+            var distanceHandle = distanceChunkPositionJob.Schedule(chunkLength, 64, state.Dependency);
+            state.Dependency = distanceHandle;
             state.Dependency.Complete();
 
             NativeArray<int> nearestChunkIndex = CollectionHelper.CreateNativeArray<int>(1, Allocator.TempJob); ;
-            var lastCenterChunkPositionJob = new LastCenterChunkPositionJob
+            var nearestChunkIndexJob = new NearestChunkIndexJob
             {
                 Distances = distanceArray,
                 NearestChunkIndex = nearestChunkIndex,
 
             };
-            var lastCenterChunkPositionHandle = lastCenterChunkPositionJob.Schedule(state.Dependency);
-            state.Dependency = lastCenterChunkPositionHandle;
+            var nearestChunkIndexHandle = nearestChunkIndexJob.Schedule(state.Dependency);
+            state.Dependency = nearestChunkIndexHandle;
             state.Dependency.Complete();
 
             WorldHelper.ChunkData chunkData = WorldHelper.SetupChunkData(world, chunkPositionList.ElementAt(nearestChunkIndex[0]));
 
-            NativeArray<int3> newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkData.Length, Allocator.TempJob);
+            NativeArray<int3> newChunkPositionArray = CollectionHelper.CreateNativeArray<int3>(chunkLength, Allocator.TempJob);
             var newChunkPositionJob = new ChunkPositionJob
             {
                 World = world,
@@ -238,14 +240,14 @@ namespace VoxelGameEngine.Chunk
                 StartZ = chunkData.StartZ,
                 EndZ = chunkData.EndZ,
             };
-            var newChunkPositionHandle = newChunkPositionJob.Schedule(newChunkPositionArray.Length, 64, state.Dependency);
+            var newChunkPositionHandle = newChunkPositionJob.Schedule(chunkLength, 64, state.Dependency);
             state.Dependency = newChunkPositionHandle;
             state.Dependency.Complete();
 
             NativeList<int3> neededChunkPositionList = new NativeList<int3>(Allocator.TempJob);
-            neededChunkPositionList.Capacity = newChunkPositionArray.Length;
+            neededChunkPositionList.Capacity = chunkLength;
             NativeList<int3> unneededChunkPositionList = new NativeList<int3>(Allocator.TempJob);
-            unneededChunkPositionList.Capacity = chunkPositionList.Length;
+            unneededChunkPositionList.Capacity = chunkLength;
 
             var neededChunkPositionJob = new NeededChunkPositionJob
             {
@@ -254,7 +256,7 @@ namespace VoxelGameEngine.Chunk
                 NeededChunkPositionList = neededChunkPositionList.AsParallelWriter(),
                 UnneededChunkPositionList = unneededChunkPositionList.AsParallelWriter()
             };
-            var neededChunkPositionHandle = neededChunkPositionJob.Schedule(newChunkPositionArray.Length, 64, state.Dependency);
+            var neededChunkPositionHandle = neededChunkPositionJob.Schedule(chunkLength, 64, state.Dependency);
             state.Dependency = neededChunkPositionHandle;
             state.Dependency.Complete();
 
@@ -268,7 +270,7 @@ namespace VoxelGameEngine.Chunk
             state.Dependency.Complete();
 
             centerPosition.Value = chunkPositionList.ElementAt(nearestChunkIndex[0]);
-
+            
             unneededChunkPositionList.Dispose();
             neededChunkPositionList.Dispose();
             newChunkPositionArray.Dispose();
@@ -306,7 +308,7 @@ namespace VoxelGameEngine.Chunk
             }
         }
         [BurstCompile]
-        private struct LastCenterChunkPositionJob : IJob
+        private struct NearestChunkIndexJob : IJob
         {
             [ReadOnly]
             public NativeArray<float> Distances;

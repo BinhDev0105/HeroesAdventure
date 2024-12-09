@@ -254,7 +254,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a4ad6eca1af8f04695a9c35af774985, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ChunkPrefab: {fileID: 919132149155446097, guid: 4305545e7f035f3459bf5d3e092687df, type: 3}
+  ChunkPrefab: {fileID: 3791439822482116475, guid: 6df815780bf7a8f45a35d371faa1d4d2, type: 3}
   MinimumPosition:
     x: -50
     y: 0
